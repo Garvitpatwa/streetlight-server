@@ -11,30 +11,38 @@ let deviceCommand = {};
 // receive data from ESP32
 app.post("/api/data", (req, res) => {
   const d = req.body;
+
   if (!d.deviceId) {
     return res.status(400).json({ error: "deviceId missing" });
   }
+
   deviceData[d.deviceId] = d;
   res.json({ success: true });
 });
 
-// ESP32 asks for command
+// ESP32 asks for command (🔥 NUMERIC RESPONSE 🔥)
 app.get("/api/command", (req, res) => {
   const id = req.query.deviceId;
-  if (!id) return res.send("NONE");
+  if (!id) return res.send("9"); // no deviceId
 
   const cmd = deviceCommand[id] || "NONE";
   deviceCommand[id] = "NONE"; // clear after read
-  res.send(cmd);
+
+  // EC200U-safe numeric commands
+  if (cmd === "OFF") res.send("0");      // turn OFF
+  else if (cmd === "ON") res.send("1");  // turn ON
+  else res.send("9");                    // no command
 });
 
-// dashboard sets command
+// dashboard / Postman sets command
 app.post("/api/command", (req, res) => {
   const { deviceId, command } = req.body;
+
   if (!deviceId || !command) {
     return res.status(400).json({ success: false });
   }
-  deviceCommand[deviceId] = command;
+
+  deviceCommand[deviceId] = command; // "ON" or "OFF"
   res.json({ success: true });
 });
 
