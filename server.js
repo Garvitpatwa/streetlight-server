@@ -1,57 +1,40 @@
 const express = require("express");
 const app = express();
 
-// middleware
 app.use(express.json());
 
-// in-memory storage
-let deviceData = {};
-let deviceCommand = {};
+let deviceCommand = {}; // store last command
 
-// receive data from ESP32
-app.post("/api/data", (req, res) => {
-  const d = req.body;
-
-  if (!d.deviceId) {
-    return res.status(400).json({ error: "deviceId missing" });
-  }
-
-  deviceData[d.deviceId] = d;
-  res.json({ success: true });
-});
-
-// ESP32 asks for command (🔥 NUMERIC RESPONSE 🔥)
-app.get("/api/command", (req, res) => {
-  const id = req.query.deviceId;
-  if (!id) return res.send("9"); // no deviceId
-
-  const cmd = deviceCommand[id] || "NONE";
-  deviceCommand[id] = "NONE"; // clear after read
-
-  // EC200U-safe numeric commands
-  if (cmd === "OFF") res.send("0");      // turn OFF
-  else if (cmd === "ON") res.send("1");  // turn ON
-  else res.send("9");                    // no command
-});
-
-// dashboard / Postman sets command
+// DASHBOARD / POSTMAN SENDS COMMAND
 app.post("/api/command", (req, res) => {
   const { deviceId, command } = req.body;
-
   if (!deviceId || !command) {
     return res.status(400).json({ success: false });
   }
 
-  deviceCommand[deviceId] = command; // "ON" or "OFF"
+  // Store numeric command
+  if (command === "ON") deviceCommand[deviceId] = "1";
+  else if (command === "OFF") deviceCommand[deviceId] = "0";
+
+  console.log("COMMAND SET:", deviceId, deviceCommand[deviceId]);
   res.json({ success: true });
 });
 
-// test route
+// ESP32 READS COMMAND (STICKY)
+app.get("/api/command", (req, res) => {
+  const id = req.query.deviceId;
+  if (!id) return res.send("9");
+
+  // return last command, default = 9
+  res.send(deviceCommand[id] || "9");
+});
+
+// TEST ROUTE
 app.get("/", (req, res) => {
   res.send("Streetlight server running");
 });
 
-// 🔥 REQUIRED PORT FIX FOR RENDER 🔥
+// RENDER PORT FIX
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log("Server running on port", PORT);
